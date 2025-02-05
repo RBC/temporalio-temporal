@@ -632,10 +632,12 @@ func (ms *MutableStateImpl) GetNexusCompletion(ctx context.Context) (nexus.Opera
 		if err != nil {
 			return nil, err
 		}
-		return nexus.NewOperationCompletionUnsuccessful(nexus.NewFailedOperationError(&nexus.FailureError{Failure: f}), nexus.OperationCompletionUnsuccessfulOptions{
-			StartTime: ms.executionState.GetStartTime().AsTime(),
-			Links:     []nexus.Link{startLink},
-		})
+		return nexus.NewOperationCompletionUnsuccessful(
+			&nexus.OperationError{State: nexus.OperationStateFailed, Cause: &nexus.FailureError{Failure: f}},
+			nexus.OperationCompletionUnsuccessfulOptions{
+				StartTime: ms.executionState.GetStartTime().AsTime(),
+				Links:     []nexus.Link{startLink},
+			})
 	case enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED:
 		f, err := commonnexus.APIFailureToNexusFailure(&failurepb.Failure{
 			Message: "operation canceled",
@@ -648,10 +650,15 @@ func (ms *MutableStateImpl) GetNexusCompletion(ctx context.Context) (nexus.Opera
 		if err != nil {
 			return nil, err
 		}
-		return nexus.NewOperationCompletionUnsuccessful(nexus.NewCanceledOperationError(&nexus.FailureError{Failure: f}), nexus.OperationCompletionUnsuccessfulOptions{
-			StartTime: ms.executionState.GetStartTime().AsTime(),
-			Links:     []nexus.Link{startLink},
-		})
+		return nexus.NewOperationCompletionUnsuccessful(
+			&nexus.OperationError{
+				State: nexus.OperationStateCanceled,
+				Cause: &nexus.FailureError{Failure: f},
+			},
+			nexus.OperationCompletionUnsuccessfulOptions{
+				StartTime: ms.executionState.GetStartTime().AsTime(),
+				Links:     []nexus.Link{startLink},
+			})
 	case enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
 		f, err := commonnexus.APIFailureToNexusFailure(&failurepb.Failure{
 			Message: "operation terminated",
@@ -662,10 +669,12 @@ func (ms *MutableStateImpl) GetNexusCompletion(ctx context.Context) (nexus.Opera
 		if err != nil {
 			return nil, err
 		}
-		return nexus.NewOperationCompletionUnsuccessful(nexus.NewFailedOperationError(&nexus.FailureError{Failure: f}), nexus.OperationCompletionUnsuccessfulOptions{
-			StartTime: ms.executionState.GetStartTime().AsTime(),
-			Links:     []nexus.Link{startLink},
-		})
+		return nexus.NewOperationCompletionUnsuccessful(
+			&nexus.OperationError{State: nexus.OperationStateFailed, Cause: &nexus.FailureError{Failure: f}},
+			nexus.OperationCompletionUnsuccessfulOptions{
+				StartTime: ms.executionState.GetStartTime().AsTime(),
+				Links:     []nexus.Link{startLink},
+			})
 	case enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
 		f, err := commonnexus.APIFailureToNexusFailure(&failurepb.Failure{
 			Message: "operation exceeded internal timeout",
@@ -679,10 +688,15 @@ func (ms *MutableStateImpl) GetNexusCompletion(ctx context.Context) (nexus.Opera
 		if err != nil {
 			return nil, err
 		}
-		return nexus.NewOperationCompletionUnsuccessful(nexus.NewFailedOperationError(&nexus.FailureError{Failure: f}), nexus.OperationCompletionUnsuccessfulOptions{
-			StartTime: ms.executionState.GetStartTime().AsTime(),
-			Links:     []nexus.Link{startLink},
-		})
+		return nexus.NewOperationCompletionUnsuccessful(
+			&nexus.OperationError{
+				State: nexus.OperationStateFailed,
+				Cause: &nexus.FailureError{Failure: f},
+			},
+			nexus.OperationCompletionUnsuccessfulOptions{
+				StartTime: ms.executionState.GetStartTime().AsTime(),
+				Links:     []nexus.Link{startLink},
+			})
 	}
 	return nil, serviceerror.NewInternal(fmt.Sprintf("invalid workflow execution status: %v", ce.GetEventType()))
 }
@@ -820,6 +834,14 @@ func (ms *MutableStateImpl) UpdateResetRunID(runID string) {
 func (ms *MutableStateImpl) IsResetRun() bool {
 	originalExecutionRunID := ms.GetExecutionInfo().GetOriginalExecutionRunId()
 	return len(originalExecutionRunID) != 0 && originalExecutionRunID != ms.GetExecutionState().GetRunId()
+}
+
+func (ms *MutableStateImpl) SetChildrenInitializedPostResetPoint(children map[string]*persistencespb.ResetChildInfo) {
+	ms.executionInfo.ChildrenInitializedPostResetPoint = children
+}
+
+func (ms *MutableStateImpl) GetChildrenInitializedPostResetPoint() map[string]*persistencespb.ResetChildInfo {
+	return ms.executionInfo.GetChildrenInitializedPostResetPoint()
 }
 
 func (ms *MutableStateImpl) GetBaseWorkflowInfo() *workflowspb.BaseExecutionInfo {
