@@ -20,35 +20,51 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package softassert
+package matching
 
 import (
-	"go.temporal.io/server/common/log"
-	"go.temporal.io/server/common/log/tag"
+	"time"
+
+	"github.com/emirpasic/gods/maps/treemap"
+	godsutils "github.com/emirpasic/gods/utils"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// That performs a soft assertion by logging an error if the given condition is false.
-// It is meant to indicate a condition that are always expected to be true.
-// Returns true if the condition is met, otherwise false.
-//
-// Example:
-// softassert.That(logger, object.state == "ready", "object is not ready")
-//
-// Best practices:
-// - Use it to check for programming errors and invariants.
-// - Use it to communicate assumptions about the code.
-// - Use it to abort or recover from an unexpected state.
-// - Never use it as a substitute for regular error handling, validation, or control flow.
-func That(logger log.Logger, condition bool, msg string) bool {
-	if !condition {
-		// By using the same prefix for all assertions, they can be reliably found in logs.
-		logger.Error("failed assertion: "+msg, tag.FailedAssertion)
-	}
-	return condition
+const emptyBacklogAge time.Duration = -1
+
+// backlogAgeTracker is not safe for concurrent use
+type backlogAgeTracker struct {
+	tree treemap.Map // unix nano as int64 -> int (count)
 }
 
-// Fail logs an error message indicating a failed assertion.
-// It works the same as That, but does not require a condition.
-func Fail(logger log.Logger, msg string) {
-	logger.Error("failed assertion: "+msg, tag.FailedAssertion)
+func newBacklogAgeTracker() backlogAgeTracker {
+	return backlogAgeTracker{tree: *treemap.NewWith(godsutils.Int64Comparator)}
+}
+
+// record adds or removes a task from the tracker.
+func (b backlogAgeTracker) record(ts *timestamppb.Timestamp, delta int) {
+	if ts == nil {
+		return
+	}
+
+	createTime := ts.AsTime().UnixNano()
+	count := delta
+	if prev, ok := b.tree.Get(createTime); ok {
+		count += prev.(int) // nolint:revive
+	}
+	if count = max(0, count); count == 0 {
+		b.tree.Remove(createTime)
+	} else {
+		b.tree.Put(createTime, count)
+	}
+}
+
+// oldestTime returns the time of the oldest task in this backlog, or
+// the zero Time if empty.
+func (b backlogAgeTracker) oldestTime() time.Time {
+	if b.tree.Empty() {
+		return time.Time{}
+	}
+	k, _ := b.tree.Min()
+	return time.Unix(0, k.(int64)) // nolint:revive
 }
