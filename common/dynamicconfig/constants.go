@@ -650,6 +650,12 @@ existing deployments even though it is a bit of a misnomer. This does not limit 
 per-_namespace_ limit on the _count_ of long-running requests. Requests are only throttled when the limit is
 exceeded, not when it is only reached.`,
 	)
+	ReducePollWorkflowHistoryRequestPriority = NewGlobalBoolSetting(
+		"frontend.reducePollWorkflowRequestPriority",
+		true,
+		`ReducePollWorkflowRequestPriority decides whether to reduce the priority of GetWorkflowExecutionHistory
+requests if WaitNewEvent is true.`,
+	)
 	FrontendGlobalMaxConcurrentLongRunningRequests = NewNamespaceIntSetting(
 		"frontend.globalNamespaceCount",
 		0,
@@ -2683,5 +2689,11 @@ WorkerActivitiesPerSecond, MaxConcurrentActivityTaskPollers.
 		"frontend.activityAPIsEnabled",
 		false,
 		`ActivityAPIsEnabled is a "feature enable" flag. `,
+	)
+
+	WorkflowRulesAPIsEnabled = NewNamespaceBoolSetting(
+		"frontend.workflowRulesAPIsEnabled",
+		false,
+		`WorkflowRulesAPIsEnabled is a "feature enable" flag. `,
 	)
 )
